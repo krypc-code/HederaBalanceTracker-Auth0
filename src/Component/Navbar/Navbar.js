@@ -3,7 +3,7 @@ import { useNavigate, useLocation as useReactLocation } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import "./Navbar.css";
 
-const Navbar = () => {
+const Navbar = ({updateBalance,updateAddress}) => {
     const navigate = useNavigate();
     const [isMenuOpen, setMenuOpen] = useState(false);
     const { loginWithRedirect, logout, isAuthenticated, user } = useAuth0();
@@ -30,12 +30,114 @@ const Navbar = () => {
             userEmail = user.email || '';
         }
     }
-    const onLogin = () => {
-        loginWithRedirect({
-            screen_hint: "login",
-            scope: "openid email profile", // Include the 'email' scope
-        });
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetch('http://127.0.0.1:6500/api/v0/getBalance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: userEmail, chainId: "296" })
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok.');
+                    }
+                    return response.json(); // Parsing the response as JSON
+                })
+                .then(data => {
+                    if (data && data.data && data.data.Data && data.data.Data.balance !== undefined) {
+                        updateAddress(data.data.Data.address); // Make sure this function is called correctly
+                        updateBalance(data.data.Data.balance);
+                    } else {
+                        throw new Error('Invalid data format.');
+                    }
+                })
+                .catch(error => {
+                    console.error("Error: ", error);
+                });
+        }
+    }, [isAuthenticated, userEmail]);
+
+
+   
+    const onLogin = async () => {
+        try {
+            await loginWithRedirect({
+                screen_hint: "login",
+                scope: "openid email profile",
+            });
+        } catch (error) {
+            console.error('Error during login:', error);
+        }
     };
+    const loginUser = async (email) => {
+        try {
+            const url = 'http://127.0.0.1:6500/api/v0/login'; // replace with the actual login API URL
+            const data = { email };
+
+            const loginResponse = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+
+            if (!loginResponse.ok) {
+                // If login fails, call the registerUser function
+                await registerUser(email);
+            } else {
+                // If login is successful, perform necessary actions
+                console.log('User logged in successfully!');
+            }
+        } catch (error) {
+            console.error('Error during login:', error);
+        }
+    };
+
+  
+
+    const registerUser = async (email) => {
+        try {
+            const url = 'http://127.0.0.1:6500/api/v0/registration';
+            const data = { email };
+
+            const registrationResponse = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+
+            if (!registrationResponse.ok) {
+                throw new Error('Failed to register user. Status: ' + registrationResponse.status);
+            }
+            console.log('User registered successfully!');
+
+            // Call fetchData or any other necessary functions here
+        } catch (error) {
+            console.error('Error during registration:', error);
+        }
+    };
+
+    // Inside the component:
+
+    useEffect(() => {
+        if (user && user.email) {
+            loginUser(user.email);
+        }
+    }, [user]);
+
+    // ... (remaining code remains unchanged)
+
+
+
+
+
+
+
     console.log("UserEmail", userEmail)
     return (
         <div>
