@@ -4,12 +4,13 @@ import { useAuth0 } from "@auth0/auth0-react";
 import "./Navbar.css";
 
 const Navbar = ({updateBalance,updateAddress}) => {
+    const baseUrl = process.env.REACT_APP_BASE_URL;
     const navigate = useNavigate();
     const [isMenuOpen, setMenuOpen] = useState(false);
     const { loginWithRedirect, logout, isAuthenticated, user } = useAuth0();
     const reactLocation = useReactLocation();
+    const [isAuthroized, setIsAuthroized] = useState(false);
 
-    console.log("user logged",user)
     useEffect(() => {
         console.log("isAuthenticated", isAuthenticated);
         if(isAuthenticated){
@@ -30,14 +31,15 @@ const Navbar = ({updateBalance,updateAddress}) => {
             userEmail = user.email || '';
         }
     }
+
     useEffect(() => {
-        if (isAuthenticated) {
-            fetch('http://127.0.0.1:6500/api/v0/getBalance', {
+        if (isAuthenticated && isAuthroized) {
+            fetch(`${baseUrl}/api/v0/getBalance`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email: userEmail, chainId: "296" })
+                body: JSON.stringify({ email: userEmail, chainId: "80001" }) // 80001, 296
             })
                 .then(response => {
                     if (!response.ok) {
@@ -48,7 +50,7 @@ const Navbar = ({updateBalance,updateAddress}) => {
                 .then(data => {
                     if (data && data.data && data.data.Data && data.data.Data.balance !== undefined) {
                         updateAddress(data.data.Data.address); // Make sure this function is called correctly
-                        updateBalance(data.data.Data.balance);
+                        updateBalance(data.data.Data.balance / 1000000000000000000);
                     } else {
                         throw new Error('Invalid data format.');
                     }
@@ -57,10 +59,8 @@ const Navbar = ({updateBalance,updateAddress}) => {
                     console.error("Error: ", error);
                 });
         }
-    }, [isAuthenticated, userEmail]);
+    }, [isAuthenticated, isAuthroized]);
 
-
-   
     const onLogin = async () => {
         try {
             await loginWithRedirect({
@@ -71,9 +71,10 @@ const Navbar = ({updateBalance,updateAddress}) => {
             console.error('Error during login:', error);
         }
     };
-    const loginUser = async (email) => {
+
+    const authUser = async (email) => {
         try {
-            const url = 'http://127.0.0.1:6500/api/v0/login'; // replace with the actual login API URL
+            const url = `${baseUrl}/api/v0/auth`; // replace with the actual login API URL
             const data = { email };
 
             const loginResponse = await fetch(url, {
@@ -83,42 +84,18 @@ const Navbar = ({updateBalance,updateAddress}) => {
                 },
                 body: JSON.stringify(data),
             });
-
+            console.log("loginResponse::", loginResponse);
             if (!loginResponse.ok) {
                 // If login fails, call the registerUser function
-                await registerUser(email);
+                // await registerUser(email);
+                setIsAuthroized(false);
             } else {
                 // If login is successful, perform necessary actions
                 console.log('User logged in successfully!');
+                setIsAuthroized(true);
             }
         } catch (error) {
             console.error('Error during login:', error);
-        }
-    };
-
-  
-
-    const registerUser = async (email) => {
-        try {
-            const url = 'http://127.0.0.1:6500/api/v0/registration';
-            const data = { email };
-
-            const registrationResponse = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
-            });
-
-            if (!registrationResponse.ok) {
-                throw new Error('Failed to register user. Status: ' + registrationResponse.status);
-            }
-            console.log('User registered successfully!');
-
-            // Call fetchData or any other necessary functions here
-        } catch (error) {
-            console.error('Error during registration:', error);
         }
     };
 
@@ -126,19 +103,12 @@ const Navbar = ({updateBalance,updateAddress}) => {
 
     useEffect(() => {
         if (user && user.email) {
-            loginUser(user.email);
+            authUser(user.email);
         }
     }, [user]);
 
     // ... (remaining code remains unchanged)
 
-
-
-
-
-
-
-    console.log("UserEmail", userEmail)
     return (
         <div>
             <nav className="bg-transparent">
